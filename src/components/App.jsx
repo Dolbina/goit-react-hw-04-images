@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useEffect, useState } from 'react';
 import { GlobalStyle } from './GlobalStyle';
 import { Searchbar } from './Searchbar/Searchbar';
 import { Layout } from './Layout/Layout';
@@ -12,99 +12,76 @@ import { Loader } from './Loader/Loader';
 const ERROR_MSG =
   'Sorry, there are no images matching your search query. Please try again.';
 
-export class App extends Component {
-  state = {
-    request: null,
-    pictures: null,
-    page: 1,
-    isLoading: false,
-    error: null,
-  };
-
-  
-  fetchImg = async () => {
-     try {
-       this.setState({ isLoading: true, error: null });
-       const search = await API.fetchImg(this.state.request, this.state.page);
-
-       //const hits = [...this.state.pictures.hits, ...search.data.hits];
-       if (this.state.page === 1) {
-         this.setState(state => ({
-           pictures: search.data,
-
-         }));
-       } else {
-         search.data.hits = [...this.state.pictures.hits, ...search.data.hits];
-         this.setState(state => ({
-           pictures: search.data,
-         }));
-       }
-       if (search.data.total === 0) { this.setState({ error: ERROR_MSG }); }
-       
-     } catch (error) {
-       this.setState({ error: 'Error, try reloading the page' });
-     } finally {
-       this.setState({ isLoading: false });
-     }
-  };
-
-  onLoadMore = () => {
-    this.setState(state => ({
-      page: state.page + 1,
-    }));
-    
-  };
-
-  onSearch = (value) => {
-    this.setState(state => ({
-      request: value.title.trim(),
-      page: 1,
-    }));
-    if (value.title.trim() === '') this.setState({ error: ERROR_MSG });
-    
-  };
+  export const App = () => {
+    const [request, setRequest] = useState('');
+    const [pictures, setPictures] = useState(null);
+    const [page, setPage] = useState(1);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null);
 
 
-  componentDidUpdate(prevProps, prevState) {
-   
-    if (
-      this.state.request !== '' &&
-      (prevState.request !== this.state.request ||
-        prevState.page !== this.state.page)
-    ) {
-      this.fetchImg();
+  useEffect(() => {
+    async function fetchImg() {
+      try {
+        setIsLoading(true);
+               setError(null);
+        const search = await API.fetchImg(request, page);
+        if (page === 1) {
+          setPictures(search.data);
+        } else {
+          setPictures(prevPictures => ({
+            ...prevPictures,
+            hits: [...prevPictures.hits, ...search.data.hits],
+          }));
+        }
+
+        if (search.data.total === 0) {
+          setError(ERROR_MSG);
+        }
+      } catch (error) {
+        setError('Error, try reloading the page');
+      } finally {
+        setIsLoading(false);
+      }
     }
-     window.scrollTo(0, document.body.scrollHeight);
-}
+   if (request !== '') fetchImg();
+  }, [request, page]);
 
-  render() {
-    return (
-      <Layout>
-        <SearchbarWrap>
-          <Searchbar onSubmit={this.onSearch} />
-        </SearchbarWrap>
-        
-        {!this.state.isLoading && this.state.error && (
-          <ErrorMessage>{this.state.error}</ErrorMessage>
-        )}
-        { !this.state.error && this.state.pictures && (
-          <ImageGallery pictures={this.state.pictures} />
-        )}
-        {this.state.isLoading && <Loader />}
-        {!this.state.isLoading &&
-          !this.state.error &&
-          this.state.pictures &&
-          this.state.pictures.total > 12 && (
-            <ButtonLoadMore
-              onClick={() => this.onLoadMore(this.state.page)}
-              page={this.state.page}
-            >
-              Load more
-            </ButtonLoadMore>
-          )}
+    
+    const onLoadMore = () => {
+      setPage(prevPage => prevPage + 1);
+    };
+   
+  const onSearch = (value) => {
+    setRequest(value.title.trim());
+    setPage(1);
+    if (value.title.trim() === '')
+      setError(ERROR_MSG);
+    };
 
-        <GlobalStyle />
-      </Layout>
-    );
-  }
-}
+  useEffect(()=> {
+  console.log(page);
+  console.log(request);
+}, [page, request]);
+
+
+  return (
+    <Layout>
+      <SearchbarWrap>
+        <Searchbar onSubmit={onSearch} />
+      </SearchbarWrap>
+      {!isLoading && error && <ErrorMessage>{error}</ErrorMessage>}
+      {!error && pictures && <ImageGallery pictures={pictures} />}
+      {isLoading && <Loader />}
+      {!isLoading &&
+        !error &&
+        pictures &&
+        pictures.total / 12 > page && (
+          <ButtonLoadMore onClick={() => onLoadMore(page)} page={page}>
+            Load more
+          </ButtonLoadMore>
+        )}
+      <GlobalStyle />
+    </Layout>
+  );
+  };
